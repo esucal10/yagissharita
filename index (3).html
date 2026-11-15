@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earth Symphony | Rainfall</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #172b49, #050b16 75%);
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 35px 15px;
+}
+
+h1 {
+    font-size: 38px;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: #aabbd1;
+    margin-bottom: 30px;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 25px;
+}
+
+canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 12px;
+    cursor: crosshair;
+    background: #101c30;
+}
+
+.controls {
+    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+button {
+    background: #2b7cb3;
+    color: white;
+    border: none;
+    padding: 13px 25px;
+    border-radius: 9px;
+    font-size: 15px;
+    cursor: pointer;
+    margin: 5px;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #3b9cd9;
+}
+
+#status {
+    font-size: 19px;
+    margin-top: 22px;
+    color: #75bdff;
+}
+
+#description {
+    color: #b8c7d9;
+    margin-top: 10px;
+}
+
+.legend {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+    color: #cbd5e1;
+}
+
+.dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 7px;
+}
+
+.hint {
+    font-size: 13px;
+    color: #899bb2;
+    margin-top: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>EARTH SYMPHONY</h1>
+
+<p class="subtitle">
+Discover the sound of global rainfall
+</p>
+
+<div class="container">
+
+    <p>NASA GLOBAL RAINFALL MAP</p>
+
+    <canvas id="map"></canvas>
+
+    <div class="controls">
+        <button onclick="startMusic()" id="start">
+            ▶ START MUSIC
+        </button>
+    </div>
+
+    <!-- Yağışa özel ayrı müzik dosyası -->
+    <audio id="bgMusic" src="yagismusik.mp3" loop crossorigin="anonymous"></audio>
+
+    <div id="status">
+        Map loaded, start the music and begin exploring!
+    </div>
+
+    <div id="description">
+        Colors will change the music filter, volume, and tempo based on rainfall amounts.
+    </div>
+
+    <div class="legend">
+        <span><i class="dot" style="background:#1b6ca8"></i>High Rainfall (Bright & Fast)</span>
+        <span><i class="dot" style="background:#6bb4d8"></i>Medium Rainfall (Balanced)</span>
+        <span><i class="dot" style="background:#e0f2f1"></i>Low Rainfall (Deep & Muffled)</span>
+    </div>
+
+    <p class="hint">
+        Move your mouse over the rainfall map to listen to the planet.
+    </p>
+
+</div>
+
+<script>
+const canvas = document.getElementById("map");
+const ctx = canvas.getContext("2d", {willReadFrequently:true});
+
+const statusText = document.getElementById("status");
+const description = document.getElementById("description");
+const bgMusic = document.getElementById("bgMusic");
+
+let image = new Image();
+let audioCtx = null;
+let filterNode = null;
+let gainNode = null;
+let started = false;
+
+// Yağış haritası görsel dosyası
+image.src = "yagisharita.jpg";
+
+image.onload = function() {
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    ctx.drawImage(image, 0, 0);
+    statusText.textContent = "Rainfall map ready! Click 'Start Music' to begin.";
+};
+
+// Initialize audio system and effect filters
+function startMusic() {
+    if (!started) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        const track = audioCtx.createMediaElementSource(bgMusic);
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.2;
+
+        filterNode = audioCtx.createBiquadFilter();
+        filterNode.type = "lowpass";
+        filterNode.frequency.value = 400;
+
+        track.connect(filterNode);
+        filterNode.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        started = true;
+    }
+
+    if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
+
+    bgMusic.play().then(() => {
+        document.getElementById("start").textContent = "✓ MUSIC ACTIVE";
+        statusText.textContent = "Music is playing! Explore the rainfall map.";
+    }).catch(err => {
+        console.error("Could not start music:", err);
+        alert("yagismusik.mp3 file could not be found or played. Please check the file name and location.");
+    });
+}
+
+// Yağış haritası renk analizi (Mavi/Yeşil tonlarına göre yoğunluk hesaplama)
+function analyzeColor(x, y) {
+    if (!image.complete || !image.naturalWidth) return;
+
+    const pixel = ctx.getImageData(x, y, 1, 1).data;
+    const r = pixel[0];
+    const g = pixel[1];
+    const b = pixel[2];
+
+    let blueIntensity = (b - r) / 150;
+    let greenIntensity = (g - r) / 150;
+    let intensity = Math.max(0, Math.min(1, (blueIntensity + greenIntensity) / 2));
+
+    if (r > 220 && g > 220 && b > 220) {
+        intensity = 0.05;
+    }
+
+    intensity = Math.max(0, Math.min(1, intensity));
+    updateMusic(intensity);
+
+    if (intensity > 0.50) {
+        statusText.textContent = "💧 HIGH RAINFALL";
+        description.textContent = "Heavy precipitation area: High volume and bright tones.";
+    } else if (intensity > 0.20) {
+        statusText.textContent = "🌧 MODERATE RAINFALL";
+        description.textContent = "Moderate precipitation area: Balanced sound.";
+    } else {
+        statusText.textContent = "☁️ LOW RAINFALL";
+        description.textContent = "Dry area: Deep, muffled and calm tones.";
+    }
+}
+
+// Müzik manipülasyonu
+function updateMusic(intensity) {
+    if (!started) return;
+
+    const now = audioCtx.currentTime;
+
+    const targetVolume = 0.25 + (intensity * 0.75);
+    gainNode.gain.setTargetAtTime(targetVolume, now, 0.1);
+
+    const targetFreq = 350 + (Math.pow(intensity, 1.5) * 17650);
+    filterNode.frequency.setTargetAtTime(targetFreq, now, 0.1);
+
+    bgMusic.playbackRate = 0.90 + (intensity * 0.25);
+}
+
+// Mouse hareket takibi
+canvas.addEventListener("pointermove", function(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((event.clientX - rect.left) * canvas.width / rect.width);
+    const y = Math.floor((event.clientY - rect.top) * canvas.height / rect.height);
+
+    if (image.complete && image.naturalWidth) {
+        analyzeColor(x, y);
+    }
+});
+
+// Mouse haritadan çıkınca
+canvas.addEventListener("pointerleave", function() {
+    if (!started) return;
+
+    const now = audioCtx.currentTime;
+    gainNode.gain.setTargetAtTime(0.15, now, 0.2);
+    filterNode.frequency.setTargetAtTime(300, now, 0.2);
+    bgMusic.playbackRate = 1.0;
+
+    statusText.textContent = "Continue exploring the rainfall map!";
+});
+</script>
+
+</body>
+</html>
